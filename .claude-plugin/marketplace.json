@@ -1,0 +1,21 @@
+{
+  "name": "gemini-local",
+  "owner": {
+    "name": "Alex Farrell"
+  },
+  "metadata": {
+    "description": "Local marketplace for the Gemini plugin.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "gemini",
+      "description": "Use Gemini from Claude Code to review code or delegate tasks. Uses your Google subscription (oauth-personal), not API key billing.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Alex Farrell"
+      },
+      "source": "./plugins/gemini"
+    }
+  ]
+}
