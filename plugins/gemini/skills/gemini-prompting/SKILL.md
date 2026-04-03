@@ -30,10 +30,12 @@ When to add blocks:
 - Research or recommendation tasks: add `citation` and `evidence` blocks.
 - Write-capable tasks: add `scope_guard` so Gemini stays narrow and avoids unrelated refactors.
 
-Model selection guidance:
-- `gemini-2.5-pro` (default): Best reasoning, largest context. Use for complex debugging, architecture review, multi-file changes.
-- `gemini-2.5-flash` (alias: `flash`): Faster, cheaper on quota. Use for simple reviews, quick lookups, straightforward fixes.
-- Leave model unset unless the user explicitly asks for one.
+Model selection guidance (quota-aware):
+- `gemini-2.5-flash` (default): Good reasoning, cheap on quota. Use for most tasks: reviews, lookups, straightforward fixes, documentation.
+- `gemini-2.5-pro` (alias: `pro`): Best reasoning, expensive on quota. Reserve for complex debugging, security audits, architecture review, multi-file refactoring. Warn the user about quota cost before using.
+- `gemini-3-flash` / `gemini-3.1-pro-preview`: Next-gen models. Same quota tiers as their 2.5 equivalents.
+- Default to Flash. Only escalate to Pro when the task genuinely requires deeper reasoning.
+- Use `--dirs` to scope context to relevant directories — reduces tokens and improves signal-to-noise.
 
 Prompt assembly checklist:
 1. Define the exact task and scope in `<task>`.

@@ -7,7 +7,7 @@ allowed-tools: Bash(node:*), Bash(bun:*), AskUserQuestion
 Run:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-companion.mjs" setup --json $ARGUMENTS
+node "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-companion.mjs" setup --json "$ARGUMENTS"
 ```
 
 If the result says Gemini is unavailable and bun is available:
@@ -25,7 +25,7 @@ bun install -g @google/gemini-cli
 - Then rerun:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-companion.mjs" setup --json $ARGUMENTS
+node "${CLAUDE_PLUGIN_ROOT}/scripts/gemini-companion.mjs" setup --json "$ARGUMENTS"
 ```
 
 If Gemini is already installed or bun is unavailable:

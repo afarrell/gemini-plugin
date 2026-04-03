@@ -7,9 +7,10 @@
  *   review              Run a code review against local git state
  *   adversarial-review  Run a challenge-focused code review
  *   task                Delegate arbitrary work to Gemini
+ *   estimate            Estimate context size and recommend model/scope
  *
  * Auth: Uses oauth-personal (Google subscription), not API key billing.
- * All invocations go through `gemini -p` (headless mode).
+ * All invocations go through Gemini's headless mode (positional prompt arg).
  */
 
 import { execSync, spawnSync } from "node:child_process";
@@ -19,6 +20,14 @@ import { join } from "node:path";
 const HOME = process.env.HOME || process.env.USERPROFILE;
 const DEFAULT_MODEL = "gemini-2.5-flash";
 const FAST_MODEL = "gemini-2.5-flash";
+
+const MODELS = {
+  "gemini-2.5-flash": { contextWindow: 1_048_576, quotaCost: "low", tier: "flash" },
+  "gemini-2.5-flash-lite": { contextWindow: 1_048_576, quotaCost: "minimal", tier: "flash-lite" },
+  "gemini-2.5-pro": { contextWindow: 1_048_576, quotaCost: "high", tier: "pro" },
+  "gemini-3-flash": { contextWindow: 1_048_576, quotaCost: "low", tier: "flash" },
+  "gemini-3.1-pro-preview": { contextWindow: 1_048_576, quotaCost: "high", tier: "pro" },
+};
 
 // ── Helpers ──
 
@@ -122,11 +131,12 @@ function gitShortstat(args) {
 
 // ── Gemini invocation ──
 
-function invokeGemini({ prompt, stdin, model, approvalMode, sandbox }) {
-  const args = ["-p", prompt, "-o", "text"];
+function invokeGemini({ prompt, stdin, model, approvalMode, sandbox, dirs }) {
+  const args = [prompt, "-o", "text"];
   if (model) args.push("-m", model);
   if (approvalMode) args.push("--approval-mode", approvalMode);
   if (sandbox) args.push("-s");
+  if (dirs) args.push("--include-directories", dirs);
 
   const result = spawnSync("gemini", args, {
     input: stdin || undefined,
@@ -300,11 +310,25 @@ function cmdTask(args) {
   const write = args.write !== false; // default to write-capable
   const approvalMode = write ? "auto_edit" : "plan";
 
+  // Auto-warn if context is likely expensive
+  warnIfExpensive(model, args.dirs);
+
+  // Pipe files via stdin if --files specified
+  let stdin = null;
+  if (args.files) {
+    stdin = run(`cat ${args.files} 2>/dev/null`, { fallback: "", timeout: 15_000 });
+    if (!stdin) {
+      console.error(`Warning: --files "${args.files}" matched no files.`);
+    }
+  }
+
   const output = invokeGemini({
     prompt: taskText,
+    stdin,
     model,
     approvalMode,
     sandbox: args.sandbox || false,
+    dirs: args.dirs,
   });
   process.stdout.write(output);
 }
@@ -319,6 +343,8 @@ function parseArgs(argv) {
     model: null,
     write: true,
     sandbox: false,
+    dirs: null,
+    files: null,
     resume: false,
     fresh: false,
     background: false,
@@ -352,6 +378,13 @@ function parseArgs(argv) {
       case "--sandbox":
         args.sandbox = true;
         break;
+      case "--dirs":
+      case "--include-directories":
+        args.dirs = argv[++i];
+        break;
+      case "--files":
+        args.files = argv[++i];
+        break;
       case "--resume":
         args.resume = true;
         break;
@@ -372,9 +405,136 @@ function parseArgs(argv) {
 
   // Normalize model aliases
   if (args.model === "flash") args.model = FAST_MODEL;
-  if (args.model === "pro") args.model = DEFAULT_MODEL;
+  if (args.model === "pro") args.model = "gemini-2.5-pro";
+  if (args.model === "3-flash") args.model = "gemini-3-flash";
+  if (args.model === "3-pro" || args.model === "3.1-pro") args.model = "gemini-3.1-pro-preview";
 
   return args;
+}
+
+// ── Context estimation ──
+
+function quickEstimateBytes(dirs) {
+  const paths = dirs ? dirs.split(",").map((p) => p.trim()) : ["."];
+  let totalKB = 0;
+  for (const p of paths) {
+    const duOut = run(`du -sk "${p}" 2>/dev/null`, { timeout: 5000, fallback: "0" });
+    const match = duOut?.match(/^(\d+)/);
+    if (match) totalKB += parseInt(match[1], 10);
+  }
+  // Subtract common large dirs when scanning whole repo
+  if (!dirs) {
+    for (const skip of [".git", "node_modules", "dist", ".next", "vendor", ".venv", "__pycache__"]) {
+      const skipOut = run(`du -sk "${skip}" 2>/dev/null`, { timeout: 3000, fallback: "0" });
+      const skipKB = parseInt(skipOut?.match(/^(\d+)/)?.[1] || "0", 10);
+      totalKB = Math.max(0, totalKB - skipKB);
+    }
+  }
+  return totalKB * 1024;
+}
+
+function estimateContext(dirs, files) {
+  let totalBytes = 0;
+  let fileCount = 0;
+
+  if (files) {
+    const out = run(`wc -c ${files} 2>/dev/null | tail -1`, { timeout: 10_000, fallback: "0" });
+    totalBytes = parseInt(out?.match(/(\d+)/)?.[1] || "0", 10);
+    const countOut = run(`ls -1 ${files} 2>/dev/null | wc -l`, { timeout: 5000, fallback: "0" });
+    fileCount = parseInt(countOut?.trim() || "0", 10);
+  } else {
+    totalBytes = quickEstimateBytes(dirs);
+    const scope = dirs ? dirs.split(",").join(" ") : ".";
+    const excludes = [".git", "node_modules", "dist", ".next", "vendor", ".venv", "__pycache__"]
+      .map((d) => `-not -path '*/${d}/*'`)
+      .join(" ");
+    const countOut = run(`find ${scope} -type f ${excludes} 2>/dev/null | wc -l`, {
+      timeout: 10_000,
+      fallback: "0",
+    });
+    fileCount = parseInt(countOut?.trim() || "0", 10);
+  }
+
+  const estimatedTokens = Math.ceil(totalBytes / 4);
+  return { totalBytes, fileCount, estimatedTokens };
+}
+
+function warnIfExpensive(model, dirs) {
+  try {
+    const totalBytes = quickEstimateBytes(dirs);
+    const estimatedTokens = Math.ceil(totalBytes / 4);
+    const modelInfo = MODELS[model] || MODELS[DEFAULT_MODEL];
+    const contextUsage = estimatedTokens / modelInfo.contextWindow;
+
+    if (contextUsage > 0.5 && modelInfo.quotaCost === "high") {
+      process.stderr.write(
+        `\n>> WARNING: ~${(estimatedTokens / 1000).toFixed(0)}K estimated tokens with ${model} (high quota cost, ~${Math.round(contextUsage * 100)}% of context window). Consider: --dirs to scope, or -m flash.\n\n`,
+      );
+    } else if (contextUsage > 0.8) {
+      process.stderr.write(
+        `\n>> WARNING: ~${(estimatedTokens / 1000).toFixed(0)}K estimated tokens — ~${Math.round(contextUsage * 100)}% of context window. Risk of truncation. Scope with --dirs or --files.\n\n`,
+      );
+    }
+  } catch {
+    // Don't block task execution on estimate failure
+  }
+}
+
+function cmdEstimate(args) {
+  const model = args.model || DEFAULT_MODEL;
+  const modelInfo = MODELS[model] || MODELS[DEFAULT_MODEL];
+  const { totalBytes, fileCount, estimatedTokens } = estimateContext(args.dirs, args.files);
+  const contextUsage = estimatedTokens / modelInfo.contextWindow;
+
+  const warnings = [];
+  if (contextUsage > 0.8) {
+    warnings.push("Context usage >" + Math.round(contextUsage * 100) + "% of " + model + " limit — risk of truncation");
+  }
+  if (contextUsage > 0.3 && modelInfo.quotaCost === "high") {
+    warnings.push("Large Pro request — significant daily quota consumption. Consider Flash or scoping with --dirs");
+  }
+  if (modelInfo.quotaCost === "high" && !args.dirs && !args.files) {
+    warnings.push("Using Pro on full repo — consider --dirs to scope, or -m flash");
+  }
+
+  const recommendedModel =
+    contextUsage > 0.3 && modelInfo.quotaCost === "high" ? FAST_MODEL : model;
+
+  const result = {
+    scope: args.dirs || args.files || "entire repo",
+    fileCount,
+    totalBytes,
+    totalMB: +(totalBytes / 1024 / 1024).toFixed(1),
+    estimatedTokens,
+    estimatedTokensK: +(estimatedTokens / 1000).toFixed(0),
+    model,
+    modelTier: modelInfo.tier,
+    contextWindow: modelInfo.contextWindow,
+    contextUsagePercent: Math.round(contextUsage * 100),
+    quotaCost: modelInfo.quotaCost,
+    recommendedModel,
+    warnings,
+  };
+
+  if (args.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  console.log("## Context Estimate\n");
+  console.log(`- **Scope:** ${result.scope}`);
+  console.log(`- **Files:** ${result.fileCount.toLocaleString()}`);
+  console.log(`- **Size:** ${result.totalMB} MB`);
+  console.log(`- **Estimated tokens:** ~${result.estimatedTokensK}K`);
+  console.log(`- **Model:** ${result.model} (${result.quotaCost} quota cost)`);
+  console.log(`- **Context usage:** ~${result.contextUsagePercent}%`);
+  if (result.recommendedModel !== result.model) {
+    console.log(`- **Recommended model:** ${result.recommendedModel}`);
+  }
+  if (warnings.length) {
+    console.log("\n### Warnings\n");
+    for (const w of warnings) console.log(`- ${w}`);
+  }
 }
 
 // ── Main ──
@@ -395,8 +555,11 @@ switch (subcommand) {
   case "task":
     cmdTask(args);
     break;
+  case "estimate":
+    cmdEstimate(args);
+    break;
   default:
     console.log(`gemini-companion: unknown subcommand "${subcommand}"`);
-    console.log("Usage: gemini-companion <setup|review|adversarial-review|task> [options]");
+    console.log("Usage: gemini-companion <setup|review|adversarial-review|task|estimate> [options]");
     process.exit(1);
 }

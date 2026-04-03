@@ -23,7 +23,9 @@ Execution rules:
 - You may use the `gemini-prompting` skill to rewrite the user's request into a tighter prompt before the single `task` call.
 - That prompt drafting is the only Claude-side work allowed. Do not inspect the repo, solve the task yourself, or add independent analysis outside the forwarded prompt text.
 - Leave model unset by default (defaults to `gemini-2.5-flash`). Add `-m` only when the user explicitly asks for a specific model.
-- Map `flash` to `-m gemini-2.5-flash`.
+- Model aliases: `flash` → `gemini-2.5-flash`, `pro` → `gemini-2.5-pro`, `3-flash` → `gemini-3-flash`, `3-pro` → `gemini-3.1-pro-preview`.
+- Context scoping: `--dirs src,lib` maps to `--include-directories`. `--files "src/**/*.ts"` pipes matching files via stdin.
+- The script auto-warns on stderr when estimated context is expensive (>50% with Pro, >80% with any model).
 - Default to a write-capable run (`--write`) unless the user explicitly asks for read-only behavior or only wants review, diagnosis, or research without edits.
 
 Command selection:
