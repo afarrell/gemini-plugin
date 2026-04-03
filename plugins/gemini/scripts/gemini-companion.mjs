@@ -17,7 +17,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const HOME = process.env.HOME || process.env.USERPROFILE;
-const DEFAULT_MODEL = "gemini-2.5-pro";
+const DEFAULT_MODEL = "gemini-2.5-flash";
 const FAST_MODEL = "gemini-2.5-flash";
 
 // ── Helpers ──

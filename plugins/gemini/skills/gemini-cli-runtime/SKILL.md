@@ -22,7 +22,7 @@ Execution rules:
 - Use `task` for every rescue request, including diagnosis, planning, research, and explicit fix requests.
 - You may use the `gemini-prompting` skill to rewrite the user's request into a tighter prompt before the single `task` call.
 - That prompt drafting is the only Claude-side work allowed. Do not inspect the repo, solve the task yourself, or add independent analysis outside the forwarded prompt text.
-- Leave model unset by default (defaults to `gemini-2.5-pro`). Add `-m` only when the user explicitly asks for a specific model.
+- Leave model unset by default (defaults to `gemini-2.5-flash`). Add `-m` only when the user explicitly asks for a specific model.
 - Map `flash` to `-m gemini-2.5-flash`.
 - Default to a write-capable run (`--write`) unless the user explicitly asks for read-only behavior or only wants review, diagnosis, or research without edits.
 
