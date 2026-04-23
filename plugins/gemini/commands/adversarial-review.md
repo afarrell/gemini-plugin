@@ -18,6 +18,11 @@ Core constraint:
 - Your only job is to run the review and return Gemini's output verbatim to the user.
 - Keep the framing focused on whether the current approach is the right one, what assumptions it depends on, and where the design could fail under real-world conditions.
 
+Model selection:
+- Defaults to `gemini-3.1-flash-lite-preview` with automatic fallback to `gemini-2.5-flash-lite`. Both quota-minimal.
+- Adversarial review genuinely benefits from deeper reasoning, but on this subscription pro quota is ~1-2 calls/month and flash is daily-limited. Don't auto-escalate. If the lite-tier verdict feels shallow on a truly high-stakes change, surface the option to re-run with `-m 3-pro`; get explicit user confirmation first.
+- For most adversarial reviews, `/gemma:adversarial-review` (local, free, dense 31B model when installed) is the better default — use it first and only reach for gemini if gemma's output was clearly insufficient or the task needs gemini's 1M-token context window.
+
 Execution mode rules:
 - If the raw arguments include `--wait`, do not ask. Run in the foreground.
 - If the raw arguments include `--background`, do not ask. Run in a Claude background task.

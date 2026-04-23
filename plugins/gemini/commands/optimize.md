@@ -24,9 +24,11 @@ From the remaining task text in `$ARGUMENTS` (after stripping flags), classify t
 
 | Complexity | Signals | Model guidance |
 |---|---|---|
-| **Simple** | lookup, "what is", single-file, quick question | Flash — never burn Pro on this |
-| **Moderate** | multi-file analysis, documentation, review | Flash unless the user explicitly wants Pro |
-| **Complex** | architecture review, security audit, cross-codebase debugging, refactoring impact | Pro is justified, but warn about quota cost |
+| **Simple** | lookup, "what is", single-file, quick question | Route to **`/gemma:rescue`** (local, free). Don't open gemini at all. |
+| **Moderate** | multi-file analysis, documentation, review | Default lite (`gemini-3.1-flash-lite-preview`) if gemini's specific advantages are actually needed. Otherwise prefer `/gemma:rescue` (deeper models like 31B) or `/codex:rescue`. |
+| **Complex** | architecture review, security audit, cross-codebase debugging, refactoring impact | Try gemma-31B first. If that was clearly insufficient, a single `-m 3-pro` call may be justified — but pro quota is **~1-2 calls/month**; confirm with the user it's worth one of them. Scope aggressively with `--dirs` / `--files`. |
+
+Quota reality on this subscription (oauth-personal): lite = minimal (default, generous daily limit), flash (non-lite) = low (daily-limited, depletes fast — opt-in only), pro = high (~1-2 calls/month — opt-in only, precious). Positioning: **gemini plugin is a reluctant fallback tool**. Route most work to `/gemma:rescue`, `/codex:rescue`, or Claude itself. Only recommend gemini when its specific advantages (1M context, orthogonal model family, specific agentic needs) actually matter.
 
 ## Step 3: Recommend scope
 
@@ -63,6 +65,7 @@ The full prompt text the user can paste or use directly.
 If the task could be split into cheaper sequential calls instead of one large call, suggest that with estimated savings.
 
 ## Rules
-- Never silently downgrade to Flash if the user explicitly asked for Pro — warn and recommend, but respect their choice
-- If context usage < 5% on any model, skip scoping recommendations — it's already cheap
-- If no task text is provided, ask what Gemini should do
+- Never silently downgrade if the user explicitly asked for Pro or Flash — warn and recommend, but respect their choice.
+- If context usage < 5% on any model, skip scoping recommendations — it's already cheap.
+- Default-recommend lite for most tasks. Only recommend flash/pro when the complexity signals genuinely require deeper reasoning.
+- If no task text is provided, ask what Gemini should do.

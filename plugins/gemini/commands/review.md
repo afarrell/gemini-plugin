@@ -15,6 +15,12 @@ Core constraint:
 - Do not fix issues, apply patches, or suggest that you are about to make changes.
 - Your only job is to run the review and return Gemini's output verbatim to the user.
 
+Model selection:
+- The companion defaults to `gemini-3.1-flash-lite-preview` with automatic fallback to `gemini-2.5-flash-lite` if the 3.1 preview is exhausted or deprecated. Both are quota-minimal.
+- Flash (non-lite) and pro tiers are opt-in only. Pro quota is ~1-2 calls/month — never auto-escalate to pro for a review.
+- If the lite-tier verdict reads shallow on a genuinely complex diff, surface the option to re-run with `-m flash` (quota-low, daily-limited) or `-m 3-pro` (quota-high, monthly-limited). Get explicit user confirmation before spending.
+- For routine reviews where gemini isn't specifically needed, suggest `/gemma:review` (local, free) instead — it's the preferred cheap-tier option on this system.
+
 Execution mode rules:
 - If the raw arguments include `--wait`, do not ask. Run the review in the foreground.
 - If the raw arguments include `--background`, do not ask. Run the review in a Claude background task.

@@ -122,25 +122,39 @@ Verify Gemini CLI installation, authentication, and configuration. Offers to ins
 
 ## Models
 
-Default model: `gemini-2.5-flash` (low quota cost, good for most tasks).
+**Positioning — this is a reluctant fallback tool.** The oauth-personal subscription has pathologically tight quotas: pro tiers are ~1-2 calls/month, non-lite flash is daily-limited and depletes fast. For routine work, always prefer:
 
-| Alias | Resolves to | Quota cost |
-|-------|-------------|------------|
-| `flash` | `gemini-2.5-flash` | Low |
-| `pro` | `gemini-2.5-pro` | High |
-| `3-flash` | `gemini-3-flash` | Low |
-| `3-pro` | `gemini-3.1-pro-preview` | High |
-| `3.1-pro` | `gemini-3.1-pro-preview` | High |
+- **`/gemma:rescue`** — local (Ollama), free, uses a dense 31B model for review/adversarial-review when installed. This is the default cheap-tier option.
+- **`/codex:rescue`** — different subscription (ChatGPT), generally more headroom for agentic coding work.
+- **Claude itself** — when the main thread already has the relevant context.
 
-Use `-m pro` only when the task genuinely requires deeper reasoning (complex debugging, security audits, architecture review). The plugin warns when Pro + large context would burn significant quota.
+Only reach for gemini when its specific advantages matter: the 1M-token context window, an orthogonal model family for second-opinion work, or agentic tool use needing deeper reasoning than gemma can provide.
+
+**Default across every subcommand:** `gemini-3.1-flash-lite-preview` (quota-minimal). Automatically falls back to `gemini-2.5-flash-lite` if the 3.1 preview is exhausted or deprecated. Non-lite flash and all pro tiers require explicit `-m` and should rarely be used.
+
+**Aliases:**
+
+| Alias | Resolves to | Quota cost | Auto-used? |
+|-------|-------------|------------|-----------|
+| `lite` / `flash-lite` / `3.1-lite` | `gemini-3.1-flash-lite-preview` | Minimal | **Default** |
+| `2.5-lite` | `gemini-2.5-flash-lite` | Minimal | Auto-fallback when 3.1 lite fails |
+| `flash` | `gemini-2.5-flash` | Low — daily-limited | Opt-in only |
+| `3-flash` | `gemini-3-flash-preview` | Low — daily-limited | Opt-in only |
+| `pro` | `gemini-2.5-pro` | High — **~1-2 calls/month** | Opt-in only |
+| `3-pro` / `3.1-pro` | `gemini-3.1-pro-preview` | High — **~1-2 calls/month** | Opt-in only |
+
+**Model IDs churn.** Google renames and deprecates Gemini preview models frequently. The companion's fallback cascade catches "model not found" / "deprecated" errors in addition to quota exhaustion, so a removed primary degrades cleanly. If both cascade entries fail, check [ai.google.dev/gemini-api/docs/models](https://ai.google.dev/gemini-api/docs/models) for the current lite IDs and update the catalog in `scripts/gemini-companion.mjs`.
 
 ## Quota Protection
 
 The plugin includes automatic quota protection:
 
 - **Auto-warning**: Before every `task` invocation, the companion script estimates context size. Warnings appear on stderr when:
-  - Context usage > 50% with a Pro model (expensive)
+  - Context usage > 50% with a Pro model (quota-high — pro allocation is ~1-2 calls/month)
+  - Context usage > 50% with a non-lite Flash model (quota-low — daily-limited)
   - Context usage > 80% with any model (truncation risk)
+- **Stderr announcement**: The companion announces the model it's running on every call, even the lite default. The lite-tier announcement reminds you that gemini is a reluctant fallback and points at `/gemma:rescue`; non-lite tiers escalate the warning with the specific quota cost.
+- **Automatic fallback**: When the default model fails with "capacity exhausted" or "model not found", the companion auto-tries the next entry in its cascade (2.5-flash-lite) and announces the switch. Never auto-falls-back to non-lite tiers — those require explicit `-m`.
 
 - **`estimate` subcommand**: Get context metrics without spending quota:
 
@@ -202,7 +216,7 @@ gemini-plugin/
 
 - **Review safety gate.** After presenting review findings, Claude must ask before making any changes. Auto-applying fixes from a review is forbidden.
 
-- **Quota-aware by default.** Flash is the default model. Pro requires explicit selection. Large-context Pro requests trigger warnings automatically.
+- **Quota-aware by default.** Gemini is positioned as a reluctant fallback tool. Every call announces its model on stderr and reminds the caller that `/gemma:rescue`, `/codex:rescue`, or Claude itself is usually the better choice for routine work. The default (3.1 lite) is quota-minimal; flash and pro tiers are opt-in only.
 
 ## Auth
 
