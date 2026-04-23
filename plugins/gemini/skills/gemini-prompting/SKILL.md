@@ -31,11 +31,29 @@ When to add blocks:
 - Write-capable tasks: add `scope_guard` so Gemini stays narrow and avoids unrelated refactors.
 
 Model selection guidance (quota-aware):
-- `gemini-2.5-flash` (default): Good reasoning, cheap on quota. Use for most tasks: reviews, lookups, straightforward fixes, documentation.
-- `gemini-2.5-pro` (alias: `pro`): Best reasoning, expensive on quota. Reserve for complex debugging, security audits, architecture review, multi-file refactoring. Warn the user about quota cost before using.
-- `gemini-3-flash` / `gemini-3.1-pro-preview`: Next-gen models. Same quota tiers as their 2.5 equivalents.
-- Default to Flash. Only escalate to Pro when the task genuinely requires deeper reasoning.
-- Use `--dirs` to scope context to relevant directories — reduces tokens and improves signal-to-noise.
+
+**Positioning.** The gemini plugin is a **reluctant fallback tool** on this subscription. The oauth-personal daily quotas are pathologically tight — pro tiers are ~1-2 calls/month, non-lite flash is daily-limited and depletes fast. Almost every request is better served elsewhere: **/gemma:rescue** for routine consultation (local, free), **/codex:rescue** for agentic coding with cloud-tier reasoning, or **Claude itself** when the main thread has the context. Gemini is for special cases where its specific advantages matter: the 1M-token context window, a genuinely orthogonal model family, or agentic tool use with a model tier gemma can't match.
+
+Default across every subcommand: `gemini-3.1-flash-lite-preview`, with automatic fallback to `gemini-2.5-flash-lite` if the 3.1 preview is exhausted or deprecated. Flash (non-lite) and pro tiers are opt-in-only via explicit `-m`.
+
+**Model catalog** (Google churns these frequently — treat IDs as provisional):
+
+| Tier | Preferred model | Alias | Quota | When to use |
+|------|-----------------|-------|-------|-------------|
+| **Lite (default)** | `gemini-3.1-flash-lite-preview` | `lite`, `flash-lite`, `3.1-lite` | Minimal | Always the default. Auto-fallback target. |
+| **Lite (fallback)** | `gemini-2.5-flash-lite` | `2.5-lite` | Minimal | Auto-used when 3.1 lite is exhausted or removed. |
+| **Flash (opt-in only)** | `gemini-2.5-flash` | `flash` | Low (daily-limited) | When lite output is clearly inadequate and the task is special-case. |
+| **Flash (opt-in only)** | `gemini-3-flash-preview` | `3-flash` | Low (daily-limited) | Pro-level reasoning at flash speed. Only via explicit `-m`. |
+| **Pro (opt-in only)** | `gemini-3.1-pro-preview` | `3-pro`, `3.1-pro` | High (~1-2/month) | Only for truly special cases where no other tool works. |
+| **Pro (opt-in only)** | `gemini-2.5-pro` | `pro` | High | Alternate pro. Same quota constraint. |
+
+**Rules for when to escalate or route elsewhere:**
+- **Routine consultation, explanation, rubber-ducking** → `/gemma:rescue` (local, free). Don't open gemini at all.
+- **Agentic coding with cloud reasoning** → `/codex:rescue` (different subscription, usually more headroom).
+- **Deeper reasoning on a bounded question** → try `/gemma:rescue` with `-m dense` first; escalate to gemini only if gemma output was clearly insufficient.
+- **Special-case work that needs gemini specifically** (massive context, agentic file work with deeper reasoning than gemma can give) → default is `/gemini:rescue` (3.1 lite, auto-fallback to 2.5 lite). Only use `-m flash` / `-m pro` when the lite pass was inadequate AND the task genuinely justifies burning scarce quota.
+
+**Important: model IDs drift.** Google renames and deprecates preview models frequently. The companion's fallback cascade catches "model not found" / "deprecated" errors in addition to quota exhaustion, so a removed primary still degrades cleanly. If both cascade entries fail, check `ai.google.dev/gemini-api/docs/models` for the current lite model IDs and update the catalog.
 
 Prompt assembly checklist:
 1. Define the exact task and scope in `<task>`.
