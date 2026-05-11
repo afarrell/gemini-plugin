@@ -16,10 +16,9 @@ Core constraint:
 - Your only job is to run the review and return Gemini's output verbatim to the user.
 
 Model selection:
-- The companion defaults to `gemini-3.1-flash-lite-preview` with automatic fallback to `gemini-2.5-flash-lite` if the 3.1 preview is exhausted or deprecated. Both are quota-minimal.
-- Flash (non-lite) and pro tiers are opt-in only. Pro quota is ~1-2 calls/month — never auto-escalate to pro for a review.
-- If the lite-tier verdict reads shallow on a genuinely complex diff, surface the option to re-run with `-m flash` (quota-low, daily-limited) or `-m 3-pro` (quota-high, monthly-limited). Get explicit user confirmation before spending.
-- For routine reviews where gemini isn't specifically needed, suggest `/gemma:review` (local, free) instead — it's the preferred cheap-tier option on this system.
+- The companion defaults to `gemini-3-flash-preview` for `review`, with cascade fallback to `gemini-2.5-flash` then `gemini-3.1-flash-lite-preview`. Flash sits in the right zone for diff review — strong reasoning on a bounded input, ~1,000/day sub-pool means routine review use is well within budget.
+- If the diff is unusually large or design-critical, surface the option to escalate with `-m pro` (`gemini-3.1-pro-preview`, empirical ~100/day sub-pool). For a deep design challenge rather than a defect-finding pass, use `/gemini:adversarial-review` instead — that command already defaults to pro.
+- For trivial / cheap-tier reviews where gemini's specific strengths aren't needed, `/gemma:review` (local, free) is fine.
 
 Execution mode rules:
 - If the raw arguments include `--wait`, do not ask. Run the review in the foreground.

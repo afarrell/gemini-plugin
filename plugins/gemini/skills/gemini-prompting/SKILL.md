@@ -32,28 +32,35 @@ When to add blocks:
 
 Model selection guidance (quota-aware):
 
-**Positioning.** The gemini plugin is a **reluctant fallback tool** on this subscription. The oauth-personal daily quotas are pathologically tight — pro tiers are ~1-2 calls/month, non-lite flash is daily-limited and depletes fast. Almost every request is better served elsewhere: **/gemma:rescue** for routine consultation (local, free), **/codex:rescue** for agentic coding with cloud-tier reasoning, or **Claude itself** when the main thread has the context. Gemini is for special cases where its specific advantages matter: the 1M-token context window, a genuinely orthogonal model family, or agentic tool use with a model tier gemma can't match.
+**Positioning.** The gemini plugin is a **complementary peer** on Google AI Pro. Published 1,500/day total is enforced as undocumented per-model sub-pools (~100/day pro, ~1,000/day flash and lite). Pick gemini when its specific advantages matter: 1M-token context, Gemini 3.1 Pro reasoning (Deep Think is model-side at the pro tier), or a genuinely orthogonal model family for second-opinion work. For trivial consultation use **/gemma:rescue** (local, free); for sustained agentic coding sessions use **/codex:rescue** (separate subscription).
 
-Default across every subcommand: `gemini-3.1-flash-lite-preview`, with automatic fallback to `gemini-2.5-flash-lite` if the 3.1 preview is exhausted or deprecated. Flash (non-lite) and pro tiers are opt-in-only via explicit `-m`.
+Defaults are tuned per subcommand:
+- `task` (rescue, agentic) → `gemini-3.1-flash-lite-preview` — agent mode fans 1 prompt into many sub-requests, so the lite sub-pool absorbs that best
+- `review` → `gemini-3-flash-preview` — strong reasoning on a bounded diff, ~1,000/day sub-pool means routine review use is well within budget
+- `adversarial-review` → `gemini-3.1-pro-preview` — strongest reasoning in the catalog, fits design challenges; ~100/day sub-pool comfortably covers a few deep reviews per day. (Google references Deep Think mode at pro; the model card doesn't document how it activates, so treat that as a marketing claim rather than a guarantee.)
+
+The cascade auto-falls-back on quota / 429 / model-not-found, AND pre-flight skips models past 90% of the empirical sub-pool to stay clear of Google's abuse-detection threshold (rolled out 2026-03-25).
 
 **Model catalog** (Google churns these frequently — treat IDs as provisional):
 
-| Tier | Preferred model | Alias | Quota | When to use |
-|------|-----------------|-------|-------|-------------|
-| **Lite (default)** | `gemini-3.1-flash-lite-preview` | `lite`, `flash-lite`, `3.1-lite` | Minimal | Always the default. Auto-fallback target. |
-| **Lite (fallback)** | `gemini-2.5-flash-lite` | `2.5-lite` | Minimal | Auto-used when 3.1 lite is exhausted or removed. |
-| **Flash (opt-in only)** | `gemini-2.5-flash` | `flash` | Low (daily-limited) | When lite output is clearly inadequate and the task is special-case. |
-| **Flash (opt-in only)** | `gemini-3-flash-preview` | `3-flash` | Low (daily-limited) | Pro-level reasoning at flash speed. Only via explicit `-m`. |
-| **Pro (opt-in only)** | `gemini-3.1-pro-preview` | `3-pro`, `3.1-pro` | High (~1-2/month) | Only for truly special cases where no other tool works. |
-| **Pro (opt-in only)** | `gemini-2.5-pro` | `pro` | High | Alternate pro. Same quota constraint. |
+| Tier | Preferred model | Alias | Empirical sub-pool | Default for |
+|------|-----------------|-------|--------------------|-----------------|
+| **Lite (3.1)** | `gemini-3.1-flash-lite-preview` | `lite`, `flash-lite`, `3.1-lite` | ~1,000/day | `task` (rescue) |
+| **Lite (2.5)** | `gemini-2.5-flash-lite` | `2.5-lite` | ~1,000/day | Cascade target |
+| **Flash (3)** | `gemini-3-flash-preview` | `flash`, `3-flash` | ~1,000/day | `review` |
+| **Flash (2.5)** | `gemini-2.5-flash` | `2.5-flash` | ~1,000/day | Review cascade |
+| **Pro (3.1)** | `gemini-3.1-pro-preview` | `pro`, `3-pro`, `3.1-pro` | ~100/day | `adversarial-review` |
+| **Pro (2.5)** | `gemini-2.5-pro` | `2.5-pro` | ~100/day | Pinning to older gen |
 
 **Rules for when to escalate or route elsewhere:**
-- **Routine consultation, explanation, rubber-ducking** → `/gemma:rescue` (local, free). Don't open gemini at all.
-- **Agentic coding with cloud reasoning** → `/codex:rescue` (different subscription, usually more headroom).
-- **Deeper reasoning on a bounded question** → try `/gemma:rescue` with `-m dense` first; escalate to gemini only if gemma output was clearly insufficient.
-- **Special-case work that needs gemini specifically** (massive context, agentic file work with deeper reasoning than gemma can give) → default is `/gemini:rescue` (3.1 lite, auto-fallback to 2.5 lite). Only use `-m flash` / `-m pro` when the lite pass was inadequate AND the task genuinely justifies burning scarce quota.
+- **Trivial consultation, explanation, rubber-ducking** → `/gemma:rescue` (local, free). Don't open gemini.
+- **Sustained agentic coding** → `/codex:rescue` (separate subscription, doesn't touch Google quota).
+- **Code review** → default `/gemini:review` (flash). Pro only if the diff is unusually large or design-critical.
+- **Design challenge / adversarial review** → `/gemini:adversarial-review` (defaults to pro with Deep Think) — this is the canonical fit for Gemini 3.1 Pro.
+- **Whole-codebase context (>200K tokens of input)** → gemini is the only option in the toolkit with a 1M window; lean into pro or flash here.
+- **Bounded rescue** → default `/gemini:rescue` (lite). Escalate with `-m flash` if the lite pass was clearly inadequate.
 
-**Important: model IDs drift.** Google renames and deprecates preview models frequently. The companion's fallback cascade catches "model not found" / "deprecated" errors in addition to quota exhaustion, so a removed primary still degrades cleanly. If both cascade entries fail, check `ai.google.dev/gemini-api/docs/models` for the current lite model IDs and update the catalog.
+**Important: model IDs drift.** Google renames and deprecates preview models frequently. The companion's fallback cascade catches "model not found" / "deprecated" / 429 errors in addition to quota exhaustion. If a whole cascade fails, check `ai.google.dev/gemini-api/docs/models` for current IDs and update `MODEL_PREFERENCES` in the companion script.
 
 Prompt assembly checklist:
 1. Define the exact task and scope in `<task>`.
