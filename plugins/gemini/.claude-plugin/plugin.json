@@ -1,7 +1,7 @@
 {
   "name": "gemini",
-  "version": "1.1.0",
-  "description": "Use Gemini from Claude Code to review code or delegate tasks. Uses your Google subscription (oauth-personal), not API key billing.",
+  "version": "1.2.2",
+  "description": "Use Gemini from Claude Code to review code, delegate tasks, or run adversarial design reviews. Tuned for Google AI Pro: per-subcommand defaults across pro/flash/lite tiers, cascade fallback on quota/429/model-deprecation, local sub-pool tracker mirroring per-model daily limits.",
   "author": {
     "name": "Alex Farrell"
   }

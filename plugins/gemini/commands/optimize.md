@@ -25,10 +25,10 @@ From the remaining task text in `$ARGUMENTS` (after stripping flags), classify t
 | Complexity | Signals | Model guidance |
 |---|---|---|
 | **Simple** | lookup, "what is", single-file, quick question | Route to **`/gemma:rescue`** (local, free). Don't open gemini at all. |
-| **Moderate** | multi-file analysis, documentation, review | Default lite (`gemini-3.1-flash-lite-preview`) if gemini's specific advantages are actually needed. Otherwise prefer `/gemma:rescue` (deeper models like 31B) or `/codex:rescue`. |
-| **Complex** | architecture review, security audit, cross-codebase debugging, refactoring impact | Try gemma-31B first. If that was clearly insufficient, a single `-m 3-pro` call may be justified — but pro quota is **~1-2 calls/month**; confirm with the user it's worth one of them. Scope aggressively with `--dirs` / `--files`. |
+| **Moderate** | multi-file analysis, code review, documentation | Recommend `gemini-3-flash-preview` (`-m flash`). Empirical sub-pool ~1,000/day on Pro — comfortable for routine use. Or `/gemma:rescue` if local is enough. |
+| **Complex** | architecture review, design challenge, security audit, cross-codebase debugging | Recommend `gemini-3.1-pro-preview` (`-m pro`). Empirical sub-pool ~100/day on Pro — plenty for a few deep reviews per day. Strongest reasoning in the catalog, 1M context for whole-codebase scope. Scope with `--dirs`/`--files` if the input is large. |
 
-Quota reality on this subscription (oauth-personal): lite = minimal (default, generous daily limit), flash (non-lite) = low (daily-limited, depletes fast — opt-in only), pro = high (~1-2 calls/month — opt-in only, precious). Positioning: **gemini plugin is a reluctant fallback tool**. Route most work to `/gemma:rescue`, `/codex:rescue`, or Claude itself. Only recommend gemini when its specific advantages (1M context, orthogonal model family, specific agentic needs) actually matter.
+Quota reality on Google AI Pro: published 1,500/day total, enforced as undocumented per-model sub-pools (~100/day for pro models, ~1,000/day for flash and lite). The companion's local tracker (`~/.gemini/claude-plugin-usage.json`) mirrors today's count and the cascade auto-skips models past 90% to avoid abuse-detection flagging. Positioning: **gemini is a complementary peer**. Route trivial work to `/gemma:rescue`, sustained agentic coding to `/codex:rescue`, and reach for gemini specifically when 1M context, Gemini 3.1 reasoning, or orthogonal-model second opinion is what the task needs.
 
 ## Step 3: Recommend scope
 
@@ -67,5 +67,5 @@ If the task could be split into cheaper sequential calls instead of one large ca
 ## Rules
 - Never silently downgrade if the user explicitly asked for Pro or Flash — warn and recommend, but respect their choice.
 - If context usage < 5% on any model, skip scoping recommendations — it's already cheap.
-- Default-recommend lite for most tasks. Only recommend flash/pro when the complexity signals genuinely require deeper reasoning.
+- For trivial / single-file lookup tasks, default-recommend `/gemma:rescue` (don't open gemini). For moderate tasks, default-recommend flash. For complex tasks where Gemini 3.1 Pro's reasoning genuinely fits, default-recommend pro.
 - If no task text is provided, ask what Gemini should do.

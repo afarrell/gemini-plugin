@@ -19,9 +19,10 @@ Core constraint:
 - Keep the framing focused on whether the current approach is the right one, what assumptions it depends on, and where the design could fail under real-world conditions.
 
 Model selection:
-- Defaults to `gemini-3.1-flash-lite-preview` with automatic fallback to `gemini-2.5-flash-lite`. Both quota-minimal.
-- Adversarial review genuinely benefits from deeper reasoning, but on this subscription pro quota is ~1-2 calls/month and flash is daily-limited. Don't auto-escalate. If the lite-tier verdict feels shallow on a truly high-stakes change, surface the option to re-run with `-m 3-pro`; get explicit user confirmation first.
-- For most adversarial reviews, `/gemma:adversarial-review` (local, free, dense 31B model when installed) is the better default — use it first and only reach for gemini if gemma's output was clearly insufficient or the task needs gemini's 1M-token context window.
+- Defaults to `gemini-3.1-pro-preview` for adversarial review. Pro is the strongest reasoning model in the catalog — the canonical fit for design challenges. (Google's marketing references Deep Think mode at the pro tier; the public model card doesn't document how it activates, so don't promise it engages automatically.) The cascade falls back to `gemini-3-flash-preview` then `gemini-3.1-flash-lite-preview` if the pro sub-pool is depleted.
+- The empirical pro sub-pool on Google AI Pro is ~100/day. A handful of adversarial reviews per day is well within budget; this is what pro is for.
+- For a very large diff where the 1M context matters, pro stays the right call (the companion warns if context >50% of window). For routine defect-finding rather than design challenge, use `/gemini:review` instead — it defaults to flash, which is faster and cheaper.
+- `/gemma:adversarial-review` (local, free) is still a fine cheap-tier option — use when the change is small enough that pro reasoning isn't needed, or when offline.
 
 Execution mode rules:
 - If the raw arguments include `--wait`, do not ask. Run in the foreground.
